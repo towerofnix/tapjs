@@ -10,6 +10,8 @@ export const RecursiveStack: FC<{
 
   const { message, stack, cause, errors } = current
 
+  let causeStack = cause?.stack
+
   let header
   if (why === 'cause') {
     header = (
@@ -37,7 +39,7 @@ export const RecursiveStack: FC<{
       {header}
 
       <Box flexDirection="column" paddingLeft={padding}>
-        <Stack stack={stack} />
+        <Stack stack={stack} causeStack={causeStack} />
         <RecursiveStack why="cause" current={cause} />
       </Box>
     </Box>

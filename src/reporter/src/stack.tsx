@@ -62,23 +62,61 @@ const getStackLines = (stack: string) =>
     .replace(/\n+$/, '')
     .split('\n')
 
-export const Stack: FC<{ stack?: string }> = ({ stack }) => {
+// Adapted from Node.js:
+// https://github.com/nodejs/node/blob/8a41d9b636be86350cd32847c3f89d327c4f6ff7/lib/internal/util/inspect.js#L1216
+const getOverlapRange = (a: any[], b: any[]): {len: number, offset: number} => {
+  for (let i = 0; i < a.length - 3; i++) {
+    // Find the first entry of b that matches the current entry of a.
+    const pos = b.indexOf(a[i]!)
+    if (pos !== -1) {
+      const rest = b.length - pos
+      if (rest > 3) {
+        let len = 1
+        const maxLen = Math.min(a.length - i, rest)
+        // Count the number of consecutive entries.
+        while (maxLen > len && a[i + len] === b[pos + len]) {
+          len++
+        }
+        if (len > 3) {
+          return { len, offset: i }
+        }
+      }
+    }
+  }
+  return { len: 0, offset: 0 }
+}
+
+export const Stack: FC<{ stack?: string, causeStack?: string }> = ({ stack, causeStack }) => {
   if (!stack?.trim()) return <></>
 
-  const st = getStackLines(stack)
-    .map(l => {
-      const c = new CallSiteLike(null, l)
-      removeRelativeGenerated(c)
-      removeRelativeGenerated(c.evalOrigin)
-      return highlightFilename(
-        c.toString(),
-        c.evalOrigin ? c.evalOrigin.fileName : c.fileName
-      )
-    })
+  const stackLines = getStackLines(stack)
+
+  let contentLines
+
+  // Adapted from Node.js:
+  // https://github.com/nodejs/node/blob/8a41d9b636be86350cd32847c3f89d327c4f6ff7/lib/internal/util/inspect.js#L1253
+  if (causeStack?.trim()) {
+    const causeLines = getStackLines(causeStack)
+    const overlap = getOverlapRange(stackLines, causeLines)
+    if (overlap.len > 0) {
+      const firstLines = causeLines.slice(0, overlap.offset)
+      const lastLines = causeLines.slice(overlap.offset + overlap.len)
+      const message = `... ${overlap.len - 2} lines matching cause trace ...`
+      contentLines = [
+        ...firstLines.map(formatLine),
+        <Text>{chalk.dim(message)}</Text>,
+        ...lastLines.map(formatLine)
+      ]
+    }
+  }
+
+  if (!contentLines) {
+    contentLines = stackLines.map(formatLine)
+  }
 
   return (
     <Box flexDirection="column">
-      {st.map((line, key) => (
+      {contentLines!.map((line, key) => (
         <HangingIndent key={key}>{line}</HangingIndent>
       ))}
     </Box>
