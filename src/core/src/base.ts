@@ -826,11 +826,11 @@ export class Base<
       er.test = this.name
     }
 
-    const message = messageFromError(er)
     if (!extra) {
       extra = extraFromError(er, extra)
     }
-    extra.message = message
+
+    this.#applyErrorMessages(er, extra)
 
     this.parser.ok = false
 
@@ -878,6 +878,38 @@ export class Base<
     }
     // we are already bailing out, and this is the top level,
     // just make our way hastily to the nearest exit.
+  }
+
+  /**
+   * Walk an Error object and its resultant Extra in parallel,
+   * applying the message from the corresponding error to each
+   * extra object.
+   *
+   * @internal
+   */
+  #applyErrorMessages(er: any, ex: Extra) {
+    if (!er) {
+      return
+    }
+
+    ex.message = messageFromError(er)
+
+    if (er.cause && typeof er.cause === 'object') {
+      this.#applyErrorMessages(er.cause, ex.cause)
+    }
+
+    if (
+      er.errors &&
+      typeof er.errors[Symbol.iterator] === 'function'
+    ) {
+      // XXX: This treats the arrays we're iterating as "generic"
+      // arrays (length & index properties), instead of as iterators.
+      // We should be iterating jointly but JS isn't there yet.
+      // https://github.com/tc39/proposal-joint-iteration
+      for (let i = 0; i < er.errors.length; i++) {
+        this.#applyErrorMessages(er.errors[i], ex.errors[i])
+      }
+    }
   }
 
   /**

@@ -594,11 +594,10 @@ export class Base extends Minipass {
         if (this.name && !proxy) {
             er.test = this.name;
         }
-        const message = messageFromError(er);
         if (!extra) {
             extra = extraFromError(er, extra);
         }
-        extra.message = message;
+        this.#applyErrorMessages(er, extra);
         this.parser.ok = false;
         // if possible to handle it here, then return the info so that this
         // Base subclass can do its thing
@@ -639,6 +638,32 @@ export class Base extends Minipass {
         }
         // we are already bailing out, and this is the top level,
         // just make our way hastily to the nearest exit.
+    }
+    /**
+     * Walk an Error object and its resultant Extra in parallel,
+     * applying the message from the corresponding error to each
+     * extra object.
+     *
+     * @internal
+     */
+    #applyErrorMessages(er, ex) {
+        if (!er) {
+            return;
+        }
+        ex.message = messageFromError(er);
+        if (er.cause && typeof er.cause === 'object') {
+            this.#applyErrorMessages(er.cause, ex.cause);
+        }
+        if (er.errors &&
+            typeof er.errors[Symbol.iterator] === 'function') {
+            // XXX: This treats the arrays we're iterating as "generic"
+            // arrays (length & index properties), instead of as iterators.
+            // We should be iterating jointly but JS isn't there yet.
+            // https://github.com/tc39/proposal-joint-iteration
+            for (let i = 0; i < er.errors.length; i++) {
+                this.#applyErrorMessages(er.errors[i], ex.errors[i]);
+            }
+        }
     }
     /**
      * returns true if the test has not as yet encountered any failures
