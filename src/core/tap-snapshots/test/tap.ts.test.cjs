@@ -231,6 +231,9 @@ Object {
         lineNumber: ##
         columnNumber: ##
         functionName: planExceeded
+      cause:
+        test: TAP
+        plan: 1
       test: TAP
       source: |2
             t.plan(1)

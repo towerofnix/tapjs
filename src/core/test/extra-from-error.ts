@@ -164,3 +164,234 @@ t.test('find a useful call site', t => {
   )
   t.end()
 })
+
+t.test('get extras for cause & errors recursively', t => {
+  t.matchOnly(
+    extraFromError(
+      new Error('Oh dear', {
+        cause: new Error('Oh me', {
+          cause: new Error('Oh my'),
+        }),
+      })
+    ),
+    {
+      at: CallSiteLike,
+      stack: String,
+      cause: {
+        at: CallSiteLike,
+        stack: String,
+        cause: {
+          at: CallSiteLike,
+          stack: String,
+        },
+      },
+    },
+    'deeply nested cause'
+  )
+
+  t.matchOnly(
+    extraFromError(
+      new AggregateError([
+        new AggregateError([new Error(), new TypeError()]),
+        new RangeError(),
+      ])
+    ),
+    {
+      type: 'AggregateError',
+      at: CallSiteLike,
+      stack: String,
+      errors: [
+        {
+          type: 'AggregateError',
+          at: CallSiteLike,
+          stack: String,
+          errors: [
+            {
+              at: CallSiteLike,
+              stack: String,
+            },
+            {
+              type: 'TypeError',
+              at: CallSiteLike,
+              stack: String,
+            },
+          ],
+        },
+        { type: 'RangeError', at: CallSiteLike, stack: String },
+      ],
+    },
+    'deeply nested errors'
+  )
+
+  t.matchOnly(
+    extraFromError(
+      new Error('Oops', {
+        cause: new AggregateError([
+          new Error('Alas', {
+            cause: new TypeError('Woe'),
+          }),
+          new RangeError('Spilt Milk'),
+        ]),
+      })
+    ),
+    {
+      at: CallSiteLike,
+      stack: String,
+      cause: {
+        type: 'AggregateError',
+        at: CallSiteLike,
+        stack: String,
+        errors: [
+          {
+            at: CallSiteLike,
+            stack: String,
+            cause: {
+              type: 'TypeError',
+              at: CallSiteLike,
+              stack: String,
+            },
+          },
+          {
+            type: 'RangeError',
+            at: CallSiteLike,
+            stack: String,
+          },
+        ],
+      },
+    },
+    'mixed nesting of cause & errors'
+  )
+
+  t.matchOnly(
+    extraFromError(
+      new Error('I know what happened!!', {
+        cause: new AggregateError(
+          [new Error('It was this!'), new TypeError('Also this!')],
+          'Check it out!',
+          {
+            cause: new SyntaxError('I am the evil mastermind!!!'),
+          }
+        ),
+      })
+    ),
+    {
+      at: CallSiteLike,
+      stack: String,
+      cause: {
+        type: 'AggregateError',
+        at: CallSiteLike,
+        stack: String,
+        errors: [
+          {
+            at: CallSiteLike,
+            stack: String,
+          },
+          {
+            type: 'TypeError',
+            at: CallSiteLike,
+            stack: String,
+          },
+        ],
+        cause: {
+          type: 'SyntaxError',
+          at: CallSiteLike,
+          stack: String,
+        },
+      },
+    },
+    'recurses cause & errors on same object'
+  )
+
+  t.end()
+})
+
+t.test('cause & errors unfamiliar type handling', t => {
+  t.matchOnly(
+    extraFromError(
+      new RangeError('Well, you see', {
+        cause: 'Something has gone terribly wrong.',
+      })
+    ),
+    {
+      type: 'RangeError',
+      at: CallSiteLike,
+      stack: String,
+      cause: 'Something has gone terribly wrong.',
+    },
+    'preserves non-object cause as-is'
+  )
+
+  t.matchOnly(
+    extraFromError(
+      Object.assign(new Error(), {
+        errors: 'What a concept',
+      })
+    ),
+    {
+      at: CallSiteLike,
+      stack: String,
+      errors: 'What a concept',
+    },
+    'preserves non-array (string) errors as-is'
+  )
+
+  t.matchOnly(
+    extraFromError(
+      Object.assign(new Error(), {
+        errors: {
+          name: 'PanicError',
+          message: 'Oh dear, oh dear.',
+        },
+      })
+    ),
+    {
+      at: CallSiteLike,
+      stack: String,
+      errors: {
+        name: 'PanicError',
+        message: 'Oh dear, oh dear.',
+      },
+    },
+    'preserves non-array (object) errors as-is'
+  )
+
+  t.matchOnly(
+    extraFromError(new AggregateError(['apple', false])),
+    {
+      type: 'AggregateError',
+      at: CallSiteLike,
+      stack: String,
+      errors: ['apple', false],
+    },
+    'preserves non-object errors items as-are'
+  )
+
+  t.matchOnly(
+    extraFromError(
+      new AggregateError([
+        'spoooky',
+        'skeletons',
+        new TypeError('Interrupting Cow'),
+        12345,
+      ])
+    ),
+    {
+      type: 'AggregateError',
+      at: CallSiteLike,
+      stack: String,
+      errors: [
+        'spoooky',
+        'skeletons',
+        {
+          type: 'TypeError',
+          at: CallSiteLike,
+          stack: String,
+        },
+        12345,
+      ],
+    },
+    'recurses object errors item alongside non-objects'
+  )
+
+  t.end()
+})

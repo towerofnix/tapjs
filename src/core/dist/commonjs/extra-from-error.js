@@ -80,6 +80,33 @@ const extraFromError = (er, extra, options) => {
     // grab any other rando props
     const { message: _, name: __, stack: ___, ...props } = er;
     Object.assign(extra, props);
+    // Object.assign doesn't set cause & errors because these
+    // properties aren't enumerable (when constructed from Error
+    // or AggregateError), so we have to take care of them manually.
+    // recurse if it looks appropriate, or preserve as-is
+    if (Object.hasOwn(er, 'cause')) {
+        if (er.cause && typeof er.cause === 'object') {
+            extra.cause = (0, exports.extraFromError)(er.cause, undefined, options);
+        }
+        else {
+            extra.cause = er.cause;
+        }
+    }
+    if (Object.hasOwn(er, 'errors')) {
+        if (Array.isArray(er.errors)) {
+            extra.errors = er.errors.map((sub) => {
+                if (sub && typeof sub === 'object') {
+                    return (0, exports.extraFromError)(sub, undefined, options);
+                }
+                else {
+                    return sub;
+                }
+            });
+        }
+        else {
+            extra.errors = er.errors;
+        }
+    }
     return extra;
 };
 exports.extraFromError = extraFromError;
