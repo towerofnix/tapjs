@@ -324,3 +324,161 @@ t.test('normalize stack line ending', t => {
   )
   t.end()
 })
+
+t.test('clean cause & errors recursively', t => {
+  t.matchOnly(
+    cleanYamlObject({
+      code: 'e_that_and_this',
+      cause: {
+        code: 'e_this_and_that',
+        cause: { found: 'foo', wanted: 'bar' },
+      },
+    }),
+    {
+      code: 'e_that_and_this',
+      cause: {
+        code: 'e_this_and_that',
+        cause: { diff: String },
+      },
+    },
+    'deeply nested cause'
+  )
+
+  t.matchOnly(
+    cleanYamlObject({
+      errors: [
+        {
+          errors: [
+            { found: 'foo', wanted: 'bar' },
+            { found: 'bim', wanted: 'bam' },
+          ],
+        },
+        { found: 'buzz', wanted: 'burr' },
+      ],
+    }),
+    {
+      errors: [
+        {
+          errors: [{ diff: /bar.*foo/s }, { diff: /bam.*bim/s }],
+        },
+        { diff: /burr.*buzz/s },
+      ],
+    },
+    'deeply nested errors'
+  )
+
+  t.matchOnly(
+    cleanYamlObject({
+      cause: {
+        errors: [
+          {
+            cause: { found: 123, wanted: 234 },
+          },
+          {
+            errors: [
+              {
+                cause: { found: 2002, wanted: 3005 },
+              },
+              { found: 575, wanted: 400 },
+            ],
+          },
+        ],
+      },
+    }),
+    {
+      cause: {
+        errors: [
+          {
+            cause: { diff: /234.*123/s },
+          },
+          {
+            errors: [
+              { cause: { diff: /3005.*2002/s } },
+              { diff: /400.*575/s },
+            ],
+          },
+        ],
+      },
+    },
+    'mixed nesting of cause & errors'
+  )
+
+  t.matchOnly(
+    cleanYamlObject({
+      cause: {
+        cause: { found: 1000, wanted: 25 },
+        errors: [{ found: 600, wanted: 12 }],
+      },
+    }),
+    {
+      cause: {
+        cause: { diff: String },
+        errors: [{ diff: String }],
+      },
+    },
+    'recurses cause & errors on same object'
+  )
+
+  t.end()
+})
+
+t.test('cause & errors unfamiliar type handling', t => {
+  t.strictSame(
+    cleanYamlObject({ cause: 'Something has gone terribly wrong.' }),
+    { cause: 'Something has gone terribly wrong.' },
+    'preserves non-object cause as-is'
+  )
+
+  t.strictSame(
+    cleanYamlObject({ errors: 'What a concept' }),
+    { errors: 'What a concept' },
+    'preserves non-array (string) errors as-is'
+  )
+
+  t.strictSame(
+    cleanYamlObject({
+      errors: {
+        kind: 'panic',
+        message: 'Oh dear, oh dear.',
+        found: 'bim',
+        wanted: 'bam',
+      },
+    }),
+    {
+      errors: {
+        kind: 'panic',
+        message: 'Oh dear, oh dear.',
+        found: 'bim',
+        wanted: 'bam',
+      },
+    },
+    'preserves non-array (object) errors as-is'
+  )
+
+  t.strictSame(
+    cleanYamlObject({
+      errors: ['apple', false],
+    }),
+    {
+      errors: ['apple', false],
+    },
+    'preserves non-object errors items as-are'
+  )
+
+  t.matchOnly(
+    cleanYamlObject({
+      errors: [
+        'spoooky',
+        'skeletons',
+        { found: 12, wanted: 13 },
+        12345,
+      ],
+    }),
+    {
+      errors: ['spoooky', 'skeletons', { diff: String }, 12345],
+    },
+    'recurses object errors item alongside non-objects'
+  )
+
+  t.end()
+})

@@ -41,6 +41,23 @@ export const cleanYamlObject = (object: { [k: string]: any }) => {
     res.errorOrigin = cleanYamlObject(res.errorOrigin)
   }
 
+  // compared to extraFromError, there's no need for special
+  // extraction of cause/errors here. cleanYamlObject is provided
+  // a mostly prepared diagnostics object, not an error object
+  // where cause & errors are non-enumerable.
+  if (res.cause && typeof res.cause === 'object') {
+    res.cause = cleanYamlObject(res.cause)
+  }
+  if (res.errors && Array.isArray(res.errors)) {
+    res.errors = res.errors.map(sub => {
+      if (sub && typeof sub === 'object') {
+        return cleanYamlObject(sub)
+      } else {
+        return sub
+      }
+    })
+  }
+
   if (
     res.at &&
     res.at instanceof stack.CallSiteLike &&
