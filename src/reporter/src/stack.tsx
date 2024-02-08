@@ -45,14 +45,27 @@ const highlightFilename = (s: string, f?: string | null) => {
   )
 }
 
-export const Stack: FC<{ stack?: string }> = ({ stack }) => {
-  if (!stack?.trim()) return <></>
+const formatLine = (l: string) => {
+  const c = new CallSiteLike(null, l)
+  removeRelativeGenerated(c)
+  removeRelativeGenerated(c.evalOrigin)
+  return highlightFilename(
+    c.toString(),
+    c.evalOrigin ? c.evalOrigin.fileName : c.fileName
+  )
+}
 
-  const st = parseStack(stack)
+const getStackLines = (stack: string) =>
+  parseStack(stack)
     .map(c => String(c))
     .join('\n')
     .replace(/\n+$/, '')
     .split('\n')
+
+export const Stack: FC<{ stack?: string }> = ({ stack }) => {
+  if (!stack?.trim()) return <></>
+
+  const st = getStackLines(stack)
     .map(l => {
       const c = new CallSiteLike(null, l)
       removeRelativeGenerated(c)
