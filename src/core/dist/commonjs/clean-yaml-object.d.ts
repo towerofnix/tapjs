@@ -5,7 +5,7 @@
  */
 export declare const cleanYamlObject: (object: {
     [k: string]: any;
-}) => {
+}, recursed?: boolean) => {
     [x: string]: any;
 };
 /**

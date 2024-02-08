@@ -19,7 +19,10 @@ const hasOwn = (obj: { [k: string]: any }, key: string) =>
  *
  * Looks up source, calculates diffs of actual/expected values, and so on.
  */
-export const cleanYamlObject = (object: { [k: string]: any }) => {
+export const cleanYamlObject = (
+  object: { [k: string]: any },
+  recursed: boolean = false
+) => {
   const res = { ...object }
   if (hasOwn(res, 'stack') && !hasOwn(res, 'at')) {
     const st = Array.isArray(res.stack)
@@ -38,7 +41,10 @@ export const cleanYamlObject = (object: { [k: string]: any }) => {
   }
 
   if (res.errorOrigin && typeof res.errorOrigin === 'object') {
-    res.errorOrigin = cleanYamlObject(res.errorOrigin)
+    // don't change recursed to true here because that would be
+    // a conflict with prior behavior (res.errorOrigin still gets
+    // its message scrapped). this may be inappropriate though?
+    res.errorOrigin = cleanYamlObject(res.errorOrigin, recursed)
   }
 
   // compared to extraFromError, there's no need for special
@@ -46,12 +52,12 @@ export const cleanYamlObject = (object: { [k: string]: any }) => {
   // a mostly prepared diagnostics object, not an error object
   // where cause & errors are non-enumerable.
   if (res.cause && typeof res.cause === 'object') {
-    res.cause = cleanYamlObject(res.cause)
+    res.cause = cleanYamlObject(res.cause, true)
   }
   if (res.errors && Array.isArray(res.errors)) {
     res.errors = res.errors.map(sub => {
       if (sub && typeof sub === 'object') {
-        return cleanYamlObject(sub)
+        return cleanYamlObject(sub, true)
       } else {
         return sub
       }
@@ -156,8 +162,11 @@ export const cleanYamlObject = (object: { [k: string]: any }) => {
   }
 
   // if the 'message' is a string, then we print it on the
-  // test point, so no need to repeat in the diags
-  if (typeof res.message === 'string') delete res.message
+  // test point, so no need to repeat in the diags... unless
+  // we've recursed and are cleaning a nested error
+  if (typeof res.message === 'string' && !recursed) {
+    delete res.message
+  }
 
   // worker: remove inline code
   if (
