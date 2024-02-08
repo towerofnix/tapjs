@@ -5,8 +5,8 @@ import { Result } from 'tap-parser'
 import { stringify } from 'tap-yaml'
 import { same } from 'tcompare'
 import { Diff } from './diff.js'
+import { RecursiveStack } from './recursive-stack.js'
 import { Source } from './source.js'
-import { Stack } from './stack.js'
 
 export const ResultDetails: FC<{ result: Result }> = ({ result }) => {
   if (!result.diag || typeof result.diag !== 'object') return <></>
@@ -51,6 +51,9 @@ export const ResultDetails: FC<{ result: Result }> = ({ result }) => {
   const { diff } = otherDiags
   delete otherDiags.diff
 
+  delete otherDiags.cause
+  delete otherDiags.errors
+
   return (
     <Box paddingLeft={4} flexDirection="column">
       <Source
@@ -82,7 +85,7 @@ export const ResultDetails: FC<{ result: Result }> = ({ result }) => {
       {!!Object.keys(otherDiags).length && (
         <Text dimColor>{stringify(otherDiags).trimEnd()}</Text>
       )}
-      <Stack stack={stack} />
+      <RecursiveStack current={result.diag} />
     </Box>
   )
 }
